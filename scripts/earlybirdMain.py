@@ -9,8 +9,7 @@ Because lists are bullshit.
 
 =====
 To do:
-1. Add default "first file" that opens automatically, perhaps with descriptive text as a
-kind of video game learning tool, learn by playing.
+1. Pick a better default folder.
 A. File/toolbar organization: Help /Version number (build in to class)
 B. Add ability to print tree.
 C. Add 'notes' above and below, which are text editor/files that are not part of the tree.

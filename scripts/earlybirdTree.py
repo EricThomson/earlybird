@@ -10,7 +10,42 @@ To do:
        Task block
    Connect + column to this method for tasks
    Add button to main for adding task block
-   Integrate into undo framework
+   
+   Integrate into undo framework (basically implement in undo right?)
+   the question is this: do I need to implement the change *and* add it
+   to the undo stack, or is it enough to just push it onto the undo stack?
+   For checkstate and edits I think I had to do it with setData. With this
+   I'm not as sure, as I am implementing the change. From Summerfield's it
+   seems it is sufficient to pass it on to the undo stack.
+   
+   Summerfield add slot is this:
+   
+       def add(self):
+        row = self.listWidget.currentRow()
+        title = "Add %s" % self.name
+        string, ok = QInputDialog.getText(self, title, "&Add")
+        if ok and string:
+            command = CommandAdd(self.listWidget, row, string,
+                                 "Add (%s)" % string)
+            self.undoStack.push(command)
+            
+        #and commandadd:
+        class CommandAdd(QUndoCommand):
+        
+            def __init__(self, listWidget, row, string, description):
+                super(CommandAdd, self).__init__(description)
+                self.listWidget = listWidget
+                self.row = row
+                self.string = string
+                self.setText(description)  #sets text of qundo *description* 
+        
+            def redo(self):
+                self.listWidget.insertItem(self.row, self.string)
+                self.listWidget.setCurrentRow(self.row)
+        
+            def undo(self):
+                self.listWidget.takeItem(self.row)
+        
    
 -Remove item functionality
 -Move item up methods
@@ -36,7 +71,27 @@ class StandardItem(QtGui.QStandardItem):
         #print "setData called with role ", role  #for debugging
         if role == QtCore.Qt.EditRole:
             oldValue = self.data(role)
-            QtGui.QStandardItem.setData(self, newValue, role)
+            #Following not needed? as putting stuff on undostack already enacts the change!
+            #Ask about this.Because if you mark out the same in checkstaterole, you
+            #don't even end up with a checkbox!
+            #
+            #Should it be needed, is the question....
+            #From overview of Qt's undo framework:
+            #
+            #The Command pattern is based on the idea that all editing in an 
+            #application is done by creating instances of command objects. 
+            #Command objects apply changes to the document and are stored 
+            #on a command stack. Furthermore, each command knows how to undo 
+            #its changes to bring the document back to its previous state. 
+            #As long as the application only uses command objects to change 
+            #the state of the document, it is possible to undo a sequence of 
+            #commands by traversing the stack downwards and calling undo on 
+            #each command in turn. It is also possible to redo a sequence 
+            #of commands by traversing the stack upwards and calling redo 
+            #on each command.
+            
+            QtGui.QStandardItem.setData(self, newValue, role) #this isn't actually needed!
+            
             model = self.model()
             if model is not None and oldValue != newValue:
                 model.itemDataChanged.emit(self, oldValue, newValue, role)
@@ -58,7 +113,7 @@ class EarlybirdTree(QtGui.QTreeView):
     columnIndices = {"Task": 0 , "+": 1, "-": 2} 
                           
     def __init__(self, parent=None, filename = None):
-        QtGui.QTreeView.__init__(self, parent=None)
+        QtGui.QTreeView.__init__(self, parent)
         self.parent = parent
         self.filename = filename
         self.model = StandardItemModel()
@@ -76,6 +131,7 @@ class EarlybirdTree(QtGui.QTreeView):
     def makeConnections(self):
         '''Connect all the signals-slots needed.'''
         self.model.itemDataChanged.connect(self.itemDataChangedSlot)
+        self.clicked.connect(self.clickedSlot)
 
     def itemDataChangedSlot(self, item, oldValue, newValue, role):
         '''Slot used to push changes of existing items onto undoStack'''
@@ -85,11 +141,38 @@ class EarlybirdTree(QtGui.QTreeView):
             self.undoStack.push(command)
             return True
         if role == QtCore.Qt.CheckStateRole:
-            command = CommandCheckStateChange(self, item, oldValue, newValue, 
+            checkStateChangeCommand = CommandCheckStateChange(self, item, oldValue, newValue, 
                 "CheckState changed from '{0}' to '{1}'".format(oldValue, newValue))
-            self.undoStack.push(command)
+            self.undoStack.push(checkStateChangeCommand)
             return True  
-            
+
+    def clickedSlot(self, index):
+        '''Handles slots associated with + and - (item add and remove)'''
+        if index.column() == self.columnIndices["+"]:
+            print "add item"
+            self.addTask(index)
+        if index.column() == self.columnIndices["-"]:
+            print "Remove item"
+            #self.removeRow(index)
+            #self.modelChanged = True
+
+    def addTask(self, parentIndex = QtCore.QModelIndex()):
+        '''Add subtask to clicked item, which is the parent'''
+        if parentIndex.isValid():
+            parentNameIndex = self.model.index(parentIndex.row(), 0, parentIndex.parent()) #add to column 0
+            parentNameItem = self.model.itemFromIndex(parentNameIndex)
+        else:
+            parentNameItem = self.rootItem
+        newTask = StandardItem("Double click to edit")
+        newTask.setCheckable(True)
+        newTask.setCheckState(QtCore.Qt.Unchecked)
+        taskUserData ={"done": False}
+        newTask.setData(taskUserData, role = QtCore.Qt.UserRole)
+        newTaskRow = self.makeItemRow(newTask) 
+        description = "Added child to {0}".format(parentNameItem.text())
+        addCommand = CommandAddTask(self, parentNameItem, newTaskRow, description)
+        self.undoStack.push(addCommand)
+        
     '''
     ***
     Next five methods are part of mechanics for loading .eb files
@@ -278,14 +361,25 @@ class EarlybirdTree(QtGui.QTreeView):
         self.undoStack.clear()
        
     def closeEvent(self, event):
-        '''Typically closeevent is called by a QMainWindow wrapper (the top-level
-        window of the app, but sometimes we do view these guys standalone, so this
-        could be helpful for that.'''
         if not self.undoStack.isClean() and self.saveChangesDialog():
             self.fileSave()
         self.close()
 
+class CommandAddTask(QtGui.QUndoCommand):
+    '''Command to add new row to parent item is pushed onto undo stack'''
+    def __init__(self, view, parentItem, newTaskRow, description):
+        QtGui.QUndoCommand.__init__(self, description)
+        self.parentItem = parentItem
+        self.newTaskRow = newTaskRow
+        self.view = view
+    def redo(self):
+        self.parentItem.appendRow(self.newTaskRow)
+        self.view.expand(self.parentItem.index())
+    def undo(self):
+        self.parentItem.takeRow(self.newTaskRow[0].row())
 
+
+           
 class CommandTextEdit(QtGui.QUndoCommand):
     '''Command for undoing/redoing text edit changes, to be placed in undostack'''
     def __init__(self, earlybirdTree, item, oldText, newText, description):
