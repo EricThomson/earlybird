@@ -1,5 +1,5 @@
 #Earlybird To Do Tree
-A simple to-do tree desktop application written in PySide. I effectively took what I was already doing extremely inefficiently in Word, and ported it to Python. 
+A simple to-do tree desktop application written in PySide. I took what I was already doing extremely inefficiently in Word, and ported it to Python. 
 
 The to do tree involves two main classes:
 - `EarlybirdTree` (defined in `earlybirdTree.py`): the core tree view. It contains the data model as well as basic methods for operations on the tree (loading and saving files, adding edited items to the undo stack, etc.). 
@@ -10,10 +10,10 @@ The data for a tree is stored in a json file with an `.eb` suffix. The folder `e
 
 
 ###To do
-- Add item 
-- Remove item 
 - Move item up
 - Move item down
+- Cosmetic changes (col widths)
+- Any refactoring
 - Daily schedule
 
 ####Open questions

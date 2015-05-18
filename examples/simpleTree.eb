@@ -1,47 +1,44 @@
 {
-  "taskblocks": [{
-      "blockname": "Home", 
-      "tasks": [
-        {
-          "name": "Clean room",
-          "done": false
-        }, 
-        
-        {
-          "name": "Install doors",
-          "done": true
-        }
-      ]
-    }, 
-    
+  "taskblocks": [
     {
-      "blockname": "Work", 
       "tasks": [
         {
-          "name": "Analysis",
-          "done": false
+          "done": false, 
+          "name": "Clean room"
         }, 
-        
         {
-          "name": "Sorting",
-          "done": false,  
-          "tasks": 
-          [
+          "done": true, 
+          "name": "Install doors"
+        }
+      ], 
+      "blockname": "Home"
+    }, 
+    {
+      "tasks": [
+        {
+          "done": false, 
+          "name": "Analysis"
+        }, 
+        {
+          "tasks": [
             {
-              "name": "Save files",
-              "done": false
-            },
-            {
-              "name": "Sort files", 
-              "done": true
+              "done": false, 
+              "name": "Save files"
             }, 
             {
-              "name": "Plot data",
-              "done": false
+              "done": true, 
+              "name": "Sort files"
+            }, 
+            {
+              "done": false, 
+              "name": "Plot data"
             }
-            ]
+          ], 
+          "done": false, 
+          "name": "Sorting"
         }
-    ]
+      ], 
+      "blockname": "Work"
     }
-    ]
-    }
+  ]
+}

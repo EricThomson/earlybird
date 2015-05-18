@@ -55,11 +55,11 @@ class EarlybirdMain(QtGui.QMainWindow):
         self.itemToolbar = self.addToolBar("Item actions")
         self.itemToolbar.addAction(self.undoAction)
         self.itemToolbar.addAction(self.redoAction)
-
-#        self.itemToolBar.addAction(self.taskblockAddAction)
-#        self.itemToolBar.addAction(self.taskAddAction)
-#        self.itemToolBar.addAction(self.itemUpAction)
-#        self.itemToolBar.addAction(self.itemDownAction)
+        self.itemToolbar.addAction(self.addBlockAction)
+        
+#        self.itemToolbar.addAction(self.taskAddAction)
+#        self.itemToolbar.addAction(self.itemUpAction)
+#        self.itemToolbar.addAction(self.itemDownAction)
 
     def closeEvent(self, event):
         '''If data has been changed, ask user if she wants to save it'''
@@ -97,11 +97,10 @@ class EarlybirdMain(QtGui.QMainWindow):
                status = "Undo previous action in undo stack")    
         self.redoAction = self.createAction("Redo", slot = self.view.undoStack.redo,
                icon = "ebRedo", tip = "Redo",
-               status = "Redo next action in undo stack")  
-                
-#        self.taskblockAddAction = self.createAction("Add block", slot = self.addTaskblock,
-#               icon = "taskblockAdd", tip = "Add task block",
-#               status = "Append task block to tree")
+               status = "Redo next action in undo stack")     
+        self.addBlockAction = self.createAction("Add block", slot = self.addBlock,
+               icon = "blockAdd", tip = "Add task block",
+               status = "Append task block to tree")
 #
 #        self.taskAddAction = self.createAction("Add task", slot = self.addTask,
 #               icon = "taskAdd", tip = "Add top-level task",
@@ -160,6 +159,10 @@ class EarlybirdMain(QtGui.QMainWindow):
         '''Opens new blank earlybird file'''
         self.view.newFile()
         self.windowTitleSet()
+        
+    def addBlock(self):
+        self.view.addItem()
+        
         
     def windowTitleSet(self):
         '''Displays filename as window title, if it exists.'''

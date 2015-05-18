@@ -3,53 +3,24 @@
 earlybirdTree.py: defines the EarlyBirdTree class:
 Uses QStandardItemModel with QTreeView to make a simple, flexible to-do tree.
 
-To do: 
--Add item functionality
-   Basic functionality in earlybirdTree
-       Task
-       Task block
-   Connect + column to this method for tasks
-   Add button to main for adding task block
-   
-   Integrate into undo framework (basically implement in undo right?)
-   the question is this: do I need to implement the change *and* add it
-   to the undo stack, or is it enough to just push it onto the undo stack?
-   For checkstate and edits I think I had to do it with setData. With this
-   I'm not as sure, as I am implementing the change. From Summerfield's it
-   seems it is sufficient to pass it on to the undo stack.
-   
-   Summerfield add slot is this:
-   
-       def add(self):
-        row = self.listWidget.currentRow()
-        title = "Add %s" % self.name
-        string, ok = QInputDialog.getText(self, title, "&Add")
-        if ok and string:
-            command = CommandAdd(self.listWidget, row, string,
-                                 "Add (%s)" % string)
-            self.undoStack.push(command)
-            
-        #and commandadd:
-        class CommandAdd(QUndoCommand):
-        
-            def __init__(self, listWidget, row, string, description):
-                super(CommandAdd, self).__init__(description)
-                self.listWidget = listWidget
-                self.row = row
-                self.string = string
-                self.setText(description)  #sets text of qundo *description* 
-        
-            def redo(self):
-                self.listWidget.insertItem(self.row, self.string)
-                self.listWidget.setCurrentRow(self.row)
-        
-            def undo(self):
-                self.listWidget.takeItem(self.row)
-        
-   
--Remove item functionality
+#Nomenclature:
+#general (block or task)
+#  nameItem/newNameItem
+#  itemRow/newItemRow 
+#Task Only
+#  taskRow/ newTaskRow
+#  taskNameItem / newTaskNameItem
+#Block only
+#  blockNameItem / newBlockNameItem
+#  blockRow / newBlockRow
+
+
+=========
+After doing remove and add functionality, refactor that shit all up in there.
 -Move item up methods
 -Move item down methods
+-Obvious cosmetic:
+    -Column widths set automatically
 -Should be enough for now to start with daily schedule
 
 """
@@ -70,35 +41,15 @@ class StandardItem(QtGui.QStandardItem):
     def setData(self, newValue, role=QtCore.Qt.UserRole + 1):
         #print "setData called with role ", role  #for debugging
         if role == QtCore.Qt.EditRole:
-            oldValue = self.data(role)
-            #Following not needed? as putting stuff on undostack already enacts the change!
-            #Ask about this.Because if you mark out the same in checkstaterole, you
-            #don't even end up with a checkbox!
-            #
-            #Should it be needed, is the question....
-            #From overview of Qt's undo framework:
-            #
-            #The Command pattern is based on the idea that all editing in an 
-            #application is done by creating instances of command objects. 
-            #Command objects apply changes to the document and are stored 
-            #on a command stack. Furthermore, each command knows how to undo 
-            #its changes to bring the document back to its previous state. 
-            #As long as the application only uses command objects to change 
-            #the state of the document, it is possible to undo a sequence of 
-            #commands by traversing the stack downwards and calling undo on 
-            #each command in turn. It is also possible to redo a sequence 
-            #of commands by traversing the stack upwards and calling redo 
-            #on each command.
-            
-            QtGui.QStandardItem.setData(self, newValue, role) #this isn't actually needed!
-            
+            oldValue = self.data(role)           
+            QtGui.QStandardItem.setData(self, newValue, role) #why needed?          
             model = self.model()
             if model is not None and oldValue != newValue:
                 model.itemDataChanged.emit(self, oldValue, newValue, role)
             return True
         if role == QtCore.Qt.CheckStateRole:
             oldValue = self.data(role)
-            QtGui.QStandardItem.setData(self, newValue, role)            
+            QtGui.QStandardItem.setData(self, newValue, role)  #why?          
             model = self.model()
             if model is not None and oldValue != newValue:                             
                 model.itemDataChanged.emit(self, oldValue, newValue, role)
@@ -108,7 +59,6 @@ class StandardItem(QtGui.QStandardItem):
         
 class EarlybirdTree(QtGui.QTreeView):
     '''The earlyBird to do tree view.'''
-    
     #Change column order with value, header label with key
     columnIndices = {"Task": 0 , "+": 1, "-": 2} 
                           
@@ -149,30 +99,45 @@ class EarlybirdTree(QtGui.QTreeView):
     def clickedSlot(self, index):
         '''Handles slots associated with + and - (item add and remove)'''
         if index.column() == self.columnIndices["+"]:
-            print "add item"
-            self.addTask(index)
+            self.addItem(index)
         if index.column() == self.columnIndices["-"]:
-            print "Remove item"
+            print "Remove item in row ", index.row()
+            self.removeItem(self.model, index)
             #self.removeRow(index)
             #self.modelChanged = True
 
-    def addTask(self, parentIndex = QtCore.QModelIndex()):
-        '''Add subtask to clicked item, which is the parent'''
-        if parentIndex.isValid():
+    def addItem(self, parentIndex = QtCore.QModelIndex()):
+        '''Add new row to parent'''
+        newNameItem = StandardItem("Double click to edit")
+        if parentIndex.isValid(): #Make a task
             parentNameIndex = self.model.index(parentIndex.row(), 0, parentIndex.parent()) #add to column 0
             parentNameItem = self.model.itemFromIndex(parentNameIndex)
-        else:
+            newNameItem.setCheckable(True)
+            newNameItem.setCheckState(QtCore.Qt.Unchecked)
+            newTaskNameUserData ={"done": False}
+            newNameItem.setData(newTaskNameUserData, role = QtCore.Qt.UserRole)
+        else:  #Make a block
             parentNameItem = self.rootItem
-        newTask = StandardItem("Double click to edit")
-        newTask.setCheckable(True)
-        newTask.setCheckState(QtCore.Qt.Unchecked)
-        taskUserData ={"done": False}
-        newTask.setData(taskUserData, role = QtCore.Qt.UserRole)
-        newTaskRow = self.makeItemRow(newTask) 
+        newItemRow = self.makeItemRow(newNameItem) 
         description = "Added child to {0}".format(parentNameItem.text())
-        addCommand = CommandAddTask(self, parentNameItem, newTaskRow, description)
+        addCommand = CommandAddItem(self, parentNameItem, newItemRow, description)
         self.undoStack.push(addCommand)
-        
+       
+    def removeItem(self, model, itemIndex = QtCore.QModelIndex()):
+        '''Remove clicked item'''
+        parentIndex = itemIndex.parent()
+        if parentIndex.isValid():
+            parentItem = model.itemFromIndex(parentIndex)
+            taskItem = parentItem.child(itemIndex.row(), 0)
+            description = "Removed '{0}' task".format(taskItem.text())
+        else:
+            parentItem = self.rootItem
+            taskItem = parentItem.child(itemIndex.row(), 0)
+            description = "Removed '{0}' block.".format(taskItem.text())
+        removeCommand = CommandRemoveItem(self, parentItem, taskItem, description)
+        self.undoStack.push(removeCommand)
+       
+
     '''
     ***
     Next five methods are part of mechanics for loading .eb files
@@ -209,19 +174,19 @@ class EarlybirdTree(QtGui.QTreeView):
         taskblockList = fileData["taskblocks"]
         self.clearModel()
         return self.loadTaskblocks(taskblockList)
-        
+               
     def loadTaskblocks(self, taskblockList):  
         '''Load task blocks into the model'''
         for (blockNum, taskblock) in enumerate(taskblockList): 
             blockNameItem = StandardItem(taskblock["blockname"])
-            taskblockItem = self.makeItemRow(blockNameItem)           
-            self.rootItem.appendRow(taskblockItem)
+            blockRow = self.makeItemRow(blockNameItem)           
+            self.rootItem.appendRow(blockRow)
             if "tasks" in taskblock:
                 taskList = taskblock["tasks"]
-                self.loadTasks(taskList, taskblockItem) 
+                self.loadTasks(taskList, blockRow) 
         return True      
        
-    def loadTasks(self, taskList, parentItem):
+    def loadTasks(self, taskList, parentRow):
         '''Recursively load tasks until we hit a base task (a task w/o any subtasks).'''
         for (taskNum, task) in enumerate(taskList):
             taskNameItem = StandardItem(task["name"])
@@ -231,19 +196,19 @@ class EarlybirdTree(QtGui.QTreeView):
                 taskNameItem.setCheckState(QtCore.Qt.Checked)           
             else:
                 taskNameItem.setCheckState(QtCore.Qt.Unchecked)
-            taskItem = self.makeItemRow(taskNameItem)
-            parentItem[0].appendRow(taskItem) #add children only to column 0  
+            taskRow = self.makeItemRow(taskNameItem)
+            parentRow[0].appendRow(taskRow) #add children only to column 0  
             if "tasks" in task:
                 subtaskList = task["tasks"]
-                return self.loadTasks(subtaskList, taskItem) 
+                return self.loadTasks(subtaskList, taskRow) 
 
     def makeItemRow(self, nameItem):
         '''Create a row for insertion in the model.'''
         itemRow = [None] * len(self.columnIndices)
         itemRow[self.columnIndices["Task"]] = nameItem
         itemRow[self.columnIndices["+"]] = StandardItem("+")
+        itemRow[self.columnIndices["-"]] = StandardItem("-") 
         itemRow[self.columnIndices["+"]].setEditable(False)
-        itemRow[self.columnIndices["-"]] = StandardItem("-")         
         itemRow[self.columnIndices["-"]].setEditable(False)  
         return itemRow
         
@@ -283,52 +248,49 @@ class EarlybirdTree(QtGui.QTreeView):
             with open(self.filename, 'w') as fileToWrite:
                 json.dump(dictModel, fileToWrite, indent=2)
         self.undoStack.clear()
-
      
     def modelToDict(self):  #def modelToDict(self, parentItem = self.rootItem):
         '''Takes model presently in view, and saves all data as dictionary.
         Called by self.saveTodoData() and self.saveTodoDataAs()'''
         dictModel = {}       
         if self.rootItem.rowCount():           
-            dictModel["taskblocks"]= self.createTaskblockList(self.rootItem)
+            dictModel["taskblocks"]= self.createBlockList()
             return dictModel
             
-    def createTaskblockList(self, parentItem):
-        '''Creates list of task blocks, and their tasks (latter using createTasklist).
-        Called by modelToDict which is used to save the model as a dictionary'''
-        numChildren = parentItem.rowCount()
-        if numChildren:
-            taskblockList = [None] * numChildren
-            childList = self.getChildren(parentItem)
-            for childNum in range(numChildren):
-                childItem = childList[childNum]
-                childTaskblockData = {}
-                childTaskblockData["blockname"]=childItem.text()               
+    def createBlockList(self):
+        '''Return list of dictionary-encoded blocks. Each block
+        also includes tasks curried from createTaskList()'''
+        blockNameItemList = self.getChildren(self.rootItem) #list of block name items without any children
+        numBlocks = len(blockNameItemList)
+        if numBlocks > 0:
+            blockNameDictList = [None]*numBlocks
+            for (blockNum, blockNameItem) in enumerate(blockNameItemList):
+                blockNameDict = {}  #create dictionary entry corresponding to each task block
+                blockNameDict["blockname"] = blockNameItem.text()               
                 #now see if the block has children (tasks)
-                if childItem.rowCount():
-                    childTaskblockData["tasks"] = self.createTaskList(childItem)
-                taskblockList[childNum] = childTaskblockData
-            return taskblockList
+                if blockNameItem.rowCount():
+                    blockNameDict["tasks"] = self.createTaskList(blockNameItem)
+                blockNameDictList[blockNum] = blockNameDict
+            return blockNameDictList
         else:
             return None
-
+            
     def createTaskList(self, parentItem):
-        '''Recursively traverses model creating list of tasks to
+        '''Recursively traverses model creating list of dictionary-encoded tasks to
         be saved as json'''
-        numChildren = parentItem.rowCount()
-        if numChildren:
-            taskList = [None] * numChildren
-            childList = self.getChildren(parentItem)
-            for childNum in range(numChildren):
-                childItem = childList[childNum]
-                childTaskData = {}
-                childTaskData["name"] = childItem.text()
-                childTaskData["done"] = True if childItem.checkState() else False
-                #now see if the present child has children
-                if childItem.rowCount():
-                    childTaskData["tasks"] = self.createTaskList(childItem)
-                taskList[childNum] = childTaskData
-            return taskList
+        taskNameList = self.getChildren(parentItem) 
+        numChildren = len(taskNameList)
+        if numChildren > 0:
+            taskNameDictList = [None] * numChildren
+            for (childNum, childNameItem) in enumerate(taskNameList):
+                taskNameDict = {}
+                taskNameDict["name"] = childNameItem.text()
+                taskNameDict["done"] = True if childNameItem.checkState() else False
+                #now see if *this* task has children
+                if childNameItem.rowCount():
+                    taskNameDict["tasks"] = self.createTaskList(childNameItem)
+                taskNameDictList[childNum] = taskNameDict
+            return taskNameDictList
         else:
             return None
             
@@ -365,7 +327,44 @@ class EarlybirdTree(QtGui.QTreeView):
             self.fileSave()
         self.close()
 
-class CommandAddTask(QtGui.QUndoCommand):
+
+class CommandRemoveItem(QtGui.QUndoCommand):
+    '''Command to remove row from tree is pushed onto undo stack
+       will this aappropriately remove children of child too?
+       
+       Doesn't seem to be working for blocks.
+       
+       Doesn't seem to expand.
+       
+       Don't like parentItem or (especially) childItem names'''
+    def __init__(self, view, parentItem, childItem, description):
+        QtGui.QUndoCommand.__init__(self, description)
+        self.parentItem = parentItem
+        self.view = view
+        self.childRow = self.view.makeItemRow(childItem)
+        self.rowNumber  = childItem.row()
+       
+    def redo(self):
+        self.parentItem.takeRow(self.rowNumber)
+       
+    def undo(self):
+        self.parentItem.insertRow(self.rowNumber, self.childRow)
+        self.view.expandAll() #could just recursively expand thsi node
+        
+        
+
+#Nomenclature:
+#general (block or task)
+#  nameItem/newNameItem
+#  itemRow/newItemRow 
+#Task Only
+#  taskRow/ newTaskRow
+#  taskNameItem / newTaskNameItem
+#Block only
+#  blockNameItem / newBlockNameItem
+#  blockRow / newBlockRow
+
+class CommandAddItem(QtGui.QUndoCommand):
     '''Command to add new row to parent item is pushed onto undo stack'''
     def __init__(self, view, parentItem, newTaskRow, description):
         QtGui.QUndoCommand.__init__(self, description)
@@ -377,9 +376,7 @@ class CommandAddTask(QtGui.QUndoCommand):
         self.view.expand(self.parentItem.index())
     def undo(self):
         self.parentItem.takeRow(self.newTaskRow[0].row())
-
-
-           
+          
 class CommandTextEdit(QtGui.QUndoCommand):
     '''Command for undoing/redoing text edit changes, to be placed in undostack'''
     def __init__(self, earlybirdTree, item, oldText, newText, description):
