@@ -3,26 +3,6 @@
 earlybirdTree.py: defines the EarlyBirdTree class:
 Uses QStandardItemModel with QTreeView to make a simple, flexible to-do tree.
 
-#Nomenclature:
-#general (block or task)
-#  nameItem/newNameItem
-#  itemRow/newItemRow 
-#Task Only
-#  taskRow/ newTaskRow
-#  taskNameItem / newTaskNameItem
-#Block only
-#  blockNameItem / newBlockNameItem
-#  blockRow / newBlockRow
-
-
-=========
-After doing remove and add functionality, refactor that shit all up in there.
--Move item up methods
--Move item down methods
--Obvious cosmetic:
-    -Column widths set automatically
--Should be enough for now to start with daily schedule
-
 """
 
 
@@ -137,7 +117,55 @@ class EarlybirdTree(QtGui.QTreeView):
         removeCommand = CommandRemoveItem(self, parentItem, taskItem, description)
         self.undoStack.push(removeCommand)
        
+    '''
+    ***
+    Following three methods are used to move rows up and down
+    ***
+    '''
+    def moveRowUp(self, index):  
+        '''Moves selected row up with children attached if it has children,
+        and only moves up within table it is in: not past parent'''
+        sourceRowNum = index.row()
+        if sourceRowNum > 0:
+            targetRowNum = sourceRowNum - 1
+            description = "Move up row {0}".format(sourceRowNum)
+            moveUpCommand = CommandMoveRow(self, index.parent(),\
+                                             sourceRowNum, targetRowNum, description)
+            self.undoStack.push(moveUpCommand)
 
+    def moveRowDown(self, index):  
+        '''Moves selected row down with children attached if it has children,
+        and only moves down within table it is in: not below next parent'''           
+        numRows = self.model.rowCount(index.parent())
+        sourceRowNum = index.row()
+        if sourceRowNum < numRows - 1:
+            targetRowNum = sourceRowNum + 1
+            description = "Move row {0} down".format(sourceRowNum)
+            moveDownCommand = CommandMoveRow(self, index.parent(),\
+                                             sourceRowNum, targetRowNum, description)
+            self.undoStack.push(moveDownCommand)
+    
+    def swapRows(self, parentIndex, rowNumber1, rowNumber2):
+        '''Swaps two rows that have the same parent, hightights the
+            content originally in rowNumber1
+        '''               
+        if parentIndex.isValid():
+            parentItem = self.model.itemFromIndex(parentIndex)
+            if parentItem.rowCount() >= max([rowNumber1, rowNumber2]):
+                sourceRowItems = parentItem.takeRow(rowNumber1)
+                parentItem.insertRow(rowNumber2, sourceRowItems)
+            else:
+                return False
+
+        else:  #top-level block row
+            sourceRowItems = self.model.takeRow(rowNumber1)
+            self.model.insertRow(rowNumber2, sourceRowItems)
+        #Following selects item moved to rowNumber2 from rowNumber1:
+        selectIndex = self.model.index(rowNumber2, 0, parentIndex)
+        self.selectionModel().clear()
+        self.selectionModel().select(selectIndex, QtGui.QItemSelectionModel.Rows | QtGui.QItemSelectionModel.SelectCurrent)
+        self.expandAll() #should just recursively expand sourceItem, not all
+         
     '''
     ***
     Next five methods are part of mechanics for loading .eb files
@@ -158,6 +186,8 @@ class EarlybirdTree(QtGui.QTreeView):
             if self.populateModel(fileData, filename):
                 self.expandAll()
                 self.filename = filename
+                for colNum in range(self.model.columnCount()):
+                    self.resizeColumnToContents(colNum)
                 self.undoStack.clear()
                 return True        
         return False   
@@ -328,13 +358,28 @@ class EarlybirdTree(QtGui.QTreeView):
         self.close()
 
 
+            
+            
+class CommandMoveRow(QtGui.QUndoCommand):
+    '''Push command that moves row up among its siblings'''
+    def __init__(self, view, parentIndex, sourceRowNum, targetRowNum, description):
+        QtGui.QUndoCommand.__init__(self, description)
+        self.parentIndex = parentIndex
+        self.sourceRowNum = sourceRowNum
+        self.targetRowNum = targetRowNum
+        self.view = view
+    def redo(self):
+        self.view.swapRows(self.parentIndex, self.sourceRowNum, self.targetRowNum)
+    def undo(self):
+        self.view.swapRows(self.parentIndex, self.targetRowNum, self.sourceRowNum)
+
+        
 class CommandRemoveItem(QtGui.QUndoCommand):
     '''Command to remove row from tree is pushed onto undo stack
-       will this aappropriately remove children of child too?
+    
+       Will this aappropriately remove children of child too?
        
-       Doesn't seem to be working for blocks.
-       
-       Doesn't seem to expand.
+       Wasn't working for blocks: check!
        
        Don't like parentItem or (especially) childItem names'''
     def __init__(self, view, parentItem, childItem, description):
@@ -364,6 +409,9 @@ class CommandRemoveItem(QtGui.QUndoCommand):
 #  blockNameItem / newBlockNameItem
 #  blockRow / newBlockRow
 
+
+    
+    
 class CommandAddItem(QtGui.QUndoCommand):
     '''Command to add new row to parent item is pushed onto undo stack'''
     def __init__(self, view, parentItem, newTaskRow, description):

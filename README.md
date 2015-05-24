@@ -5,16 +5,23 @@ The to do tree involves two main classes:
 - `EarlybirdTree` (defined in `earlybirdTree.py`): the core tree view. It contains the data model as well as basic methods for operations on the tree (loading and saving files, adding edited items to the undo stack, etc.). 
 - `EarlybirdMain` (defined in `earlybirdMain.py`): a simple main window wrapper for `EarlybirdTree` objects. It allows the user to interact with the tree's methods using menus and toolbars. 
 
-The data for a tree is stored in a json file with an `.eb` suffix. The folder `earlybird/examples` includes the following examples:
+The data for a tree is stored in a json file with an `.eb` extension. The folder `earlybird/examples` includes the following examples:
 - `simpleTree.eb`   A small to-do tree. Run `earlybirdMain.py` and load it.
 
 
+###Conventions for variable names
+- Items and blocks
+  - Generic(block or task): nameItem/newNameItem ; itemRow/newItemRow 
+  - Task Only: taskRow/ newTaskRow ; taskNameItem / newTaskNameItem
+  - Block only: blockNameItem / newBlockNameItem ; blockRow / newBlockRow
+
+- Children and parents: parentIndex/parentItem ; childIndex/childItem
+    
+
 ###To do
-- Move item up
-- Move item down
-- Cosmetic changes (col widths)
-- Any refactoring
-- Daily schedule
+- Try to break code. Fix what you break.
+- Refactor, make sure comments are good.
+- Add daily schedule
 
 ####Open questions
 

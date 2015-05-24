@@ -1,28 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 earlybirdMain.py
-    A wrapper for the EarlybirdTree class that allows for user interaction
-    with a to do tree.
+    A wrapper for the EarlybirdTree class. It allows for user interaction
+    with a to do tree that is defined in earlybirdTree.py.
     
 Early bird to do tree. 
-Because lists are bullshit.
-
-=====
-To do:
-1. Pick a better default folder.
-A. File/toolbar organization: Help /Version number (build in to class)
-B. Add ability to print tree.
-C. Add 'notes' above and below, which are text editor/files that are not part of the tree.
-Like my monthly things and such.
-D. Let user select color for taskblock with a menu button. Have color start as default white instead
-of what you are doing now. Let user select color of blocks. And then save/load this make sure
-the save/load of color works.
-    -Have selected row take on just slightly ligher color within block
-    -When you built by hand and then open a file, the color vals don't work quite right (e.g., 
-     pink taskblock, then open a new guy, it will also have the first task block pink).
-
-
-
+Because life ain't a list.
 
 """
 import sys
@@ -48,6 +31,7 @@ class EarlybirdMain(QtGui.QMainWindow):
     def createToolbars(self):
         '''Create toolbars for actions on files and items'''
         self.fileToolbar = self.addToolBar("File actions")
+        self.fileToolbar.addAction(self.printFileAction)
         self.fileToolbar.addAction(self.fileNewAction)
         self.fileToolbar.addAction(self.fileOpenAction)
         self.fileToolbar.addAction(self.fileSaveAction)
@@ -56,10 +40,8 @@ class EarlybirdMain(QtGui.QMainWindow):
         self.itemToolbar.addAction(self.undoAction)
         self.itemToolbar.addAction(self.redoAction)
         self.itemToolbar.addAction(self.addBlockAction)
-        
-#        self.itemToolbar.addAction(self.taskAddAction)
-#        self.itemToolbar.addAction(self.itemUpAction)
-#        self.itemToolbar.addAction(self.itemDownAction)
+        self.itemToolbar.addAction(self.itemUpAction)
+        self.itemToolbar.addAction(self.itemDownAction)
 
     def closeEvent(self, event):
         '''If data has been changed, ask user if she wants to save it'''
@@ -70,6 +52,7 @@ class EarlybirdMain(QtGui.QMainWindow):
     def createMenus(self):
         '''Create menu for actions on files'''
         self.fileMenu = self.menuBar().addMenu("&File")
+        self.fileMenu.addAction(self.printFileAction)
         self.fileMenu.addAction(self.fileOpenAction)    
         self.fileMenu.addAction(self.fileNewAction)
         self.fileMenu.addAction(self.fileSaveAction)
@@ -78,6 +61,9 @@ class EarlybirdMain(QtGui.QMainWindow):
     def createActions(self):
         '''Create all actions to be used in toolbars/menus: calls createAction()'''
         #File actions
+        self.printFileAction = self.createAction("&Print", slot = self.printFile,
+                shortcut = QtGui.QKeySequence.Print, icon = "ebPrint", tip = "Print file",
+                status = "Print file")
         self.fileNewAction = self.createAction("&New", slot = self.newFile,
                 shortcut = QtGui.QKeySequence.New, icon = "ebFileNew", tip = "New file",
                 status = "Create a new file")
@@ -101,18 +87,12 @@ class EarlybirdMain(QtGui.QMainWindow):
         self.addBlockAction = self.createAction("Add block", slot = self.addBlock,
                icon = "blockAdd", tip = "Add task block",
                status = "Append task block to tree")
-#
-#        self.taskAddAction = self.createAction("Add task", slot = self.addTask,
-#               icon = "taskAdd", tip = "Add top-level task",
-#               status = "Append top-level task to tree")
-#               
-#        self.itemUpAction = self.createAction("Move up", slot = self.moveRowUp,
-#               icon = "moveItemUp", tip = "Move up",
-#               status = "Move selected item up in the tree")
-#               
-#        self.itemDownAction = self.createAction("Move down", slot = self.moveRowDown,
-#           icon = "moveItemDown", tip = "Move down",
-#           status = "Move selected item down in the tree")
+        self.itemUpAction = self.createAction("Move up", slot = self.moveRowUp,
+               icon = "ebMoveUp", tip = "Move up",
+               status = "Move selected item up in the tree")
+        self.itemDownAction = self.createAction("Move down", slot = self.moveRowDown,
+           icon = "ebMoveDown", tip = "Move down",
+           status = "Move selected item down in the tree")
 
     def createAction(self, text, slot=None, shortcut=None, icon=None,
                      tip=None, status = None):
@@ -129,6 +109,28 @@ class EarlybirdMain(QtGui.QMainWindow):
         if slot is not None:
             action.triggered.connect(slot)
         return action 
+        
+    def moveRowUp(self):
+        selectedIndexes = self.view.selectedIndexes()
+        self.view.moveRowUp(selectedIndexes[0])
+        
+    def moveRowDown(self):
+        selectedIndexes = self.view.selectedIndexes()
+        self.view.moveRowDown(selectedIndexes[0])
+        
+    def printFile(self):
+        '''Saves the tree as PDF: it looks pretty ugly, so I look at this as
+        a placeholder for a real print function: probably should just add
+        this to save as, to save it as a pdf, as it really isn't printing at all!'''
+        printer = QtGui.QPrinter(QtGui.QPrinter.HighResolution)
+        printer.setPageSize(QtGui.QPrinter.Letter)
+        printer.setOutputFormat(QtGui.QPrinter.PdfFormat)
+        printer.setOutputFileName("treeTest.pdf")
+        painter = QtGui.QPainter()
+        painter.begin(printer)
+        painter.scale(20, 20)
+        self.view.render(painter, QtCore.QPoint())
+        painter.end()
         
     def createStatusBar(self):                          
         self.status = self.statusBar()
@@ -178,6 +180,7 @@ def main():
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     
     ebApp = QtGui.QApplication(sys.argv)
+    ebApp.setStyle('Cleanlooks')  #cleanlooks
     #print QtGui.QStyleFactory.keys()
     #ebApp.setStyle("Plastique")
     mainEb = EarlybirdMain(filename = None)#"simpleTodo.eb"
@@ -207,31 +210,3 @@ if __name__ == "__main__":
 #        else:
 #            self.resize(800, self.height())  
     
-#Below are the dregs.....perhaps one will become a Phoenix   
-#
-#    def itemChangedSlot(self, item):
-#        '''Handles editing of task, comment'''
-#        #print "item userdata:", item.data() #(role = QtCore.Qt.UserRole)
-#        #print "Item changed name, row, col: ", item.text(), item.row(), item.column()
-#        if item.column() == self.columnIndices["name"]:            
-#            #print "checkbox state:", item.checkState()
-#            itemUserData = item.data(role = QtCore.Qt.UserRole)
-#            #print "itemChanged item.data(): ", itemUserData
-#            if itemUserData["type"] == "taskblock":
-#                print "blockhead"
-#            elif itemUserData["type"] == "task":
-#                print "Taskmaster"
-
-#    def data(self, index, role):
-#        if role == QtCore.Qt.BackgroundRole:
-#            return QtGui.QBrush(QtGui.QColor(QtCore.Qt.green))       
-#        return QtGui.QStandardItemModel.data(self, index, role)
-            
-#Following if you end up using QAbstractItemModel
-#class TreeItem(object):
-#    def __init__(self, data, parent):
-#        self.parent = parent
-#        self.itemData = data
-#        self.childItems = []
-#        if parent is not None:
-#            parent.childItems.append(self)
