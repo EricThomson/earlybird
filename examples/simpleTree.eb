@@ -1,17 +1,18 @@
 {
-  "taskblocks": [
+  "tasks": [
     {
       "tasks": [
         {
-          "done": false, 
-          "name": "Clean room"
-        }, 
-        {
           "done": true, 
           "name": "Install doors"
+        }, 
+        {
+          "done": false, 
+          "name": "Clean room"
         }
       ], 
-      "blockname": "Home"
+      "done": false, 
+      "name": "Home"
     }, 
     {
       "tasks": [
@@ -23,22 +24,23 @@
           "tasks": [
             {
               "done": false, 
-              "name": "Save files"
+              "name": "Plot data"
+            }, 
+            {
+              "done": false, 
+              "name": "Save files in new computer"
             }, 
             {
               "done": true, 
               "name": "Sort files"
-            }, 
-            {
-              "done": false, 
-              "name": "Plot data"
             }
           ], 
           "done": false, 
           "name": "Sorting"
         }
       ], 
-      "blockname": "Work"
+      "done": false, 
+      "name": "Work"
     }
   ]
 }

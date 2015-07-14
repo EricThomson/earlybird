@@ -2,6 +2,7 @@
 """
 test_earlybirdTree.py
 Basic unit testing for earlybirdTree.py, in particular loading files.
+Make sure the folder containing the earlybird folder is in your path.
 """
 import sys
 import unittest
@@ -10,9 +11,9 @@ from earlybird.scripts.earlybirdTree import EarlybirdTree
 
   
 class Test_EarlybirdTree(unittest.TestCase):
-    '''Test the game'''
+    '''Test the earlybirdtree class'''
     def setUp(self):
-        #try/except is in case qapplication intance already exists
+        #try/except is in case qapplication instance already exists
         #http://lists.qt-project.org/pipermail/pyside/2013-October/001670.html
         try: 
             self.ebApp = QtGui.QApplication(sys.argv)
@@ -20,16 +21,12 @@ class Test_EarlybirdTree(unittest.TestCase):
             pass
         self.tree = EarlybirdTree()
        
-    def test_load_pure_top_block_tree_returns_true(self):
-        self.assertEqual(self.tree.loadEarlybirdFile(filename = "blockOnlyTest.eb"),
-                         True)
-
-    def test_load_pure_top_task_tree_returns_false(self):
-        self.assertEqual(self.tree.loadEarlybirdFile(filename = "taskOnlyTest.eb"),
+    def test_load_improperly_formatted_file_returns_false(self):
+        self.assertEqual(self.tree.loadEarlybirdFile(filename = "improperFormatTest.eb"),
                          False)
         
-    def test_load_mixed_tree_returns_true(self):
-        self.assertEqual(self.tree.loadEarlybirdFile(filename = "mixedTest.eb"),
+    def test_load_properly_formatted_file_returns_true(self):
+        self.assertEqual(self.tree.loadEarlybirdFile(filename = "properFormatTest.eb"),
                          True)
         
     

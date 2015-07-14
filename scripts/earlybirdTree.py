@@ -3,6 +3,9 @@
 earlybirdTree.py: defines the EarlyBirdTree class:
 Uses QStandardItemModel with QTreeView to make a simple, flexible to-do tree.
 
+Make sure they both work
+Make sure unit tests work
+Reup at github.
 """
 
 
@@ -13,11 +16,18 @@ from PySide import QtGui, QtCore
               
         
 class StandardItemModel(QtGui.QStandardItemModel):
-    '''Our standard item model will have a special signal for when items are edited'''
+    '''
+    Our standard item model will have a special signal for when items are edited
+    '''
     itemDataChanged = QtCore.Signal(object, object, object, object)
     
     
 class StandardItem(QtGui.QStandardItem):
+    '''
+    QStandardItem with setData reimplemented for placing edits on undostack, 
+    as discussed at:
+      http://stackoverflow.com/questions/29527610/how-to-undo-edit-of-qstandarditem-in-pyside-pyqt
+    '''
     def setData(self, newValue, role=QtCore.Qt.UserRole + 1):
         #print "setData called with role ", role  #for debugging
         if role == QtCore.Qt.EditRole:
@@ -38,7 +48,9 @@ class StandardItem(QtGui.QStandardItem):
 
         
 class EarlybirdTree(QtGui.QTreeView):
-    '''The earlyBird to do tree view.'''
+    '''
+    The earlyBird to do tree view.
+    '''
     #Change column order with value, header label with key
     columnIndices = {"Task": 0 , "+": 1, "-": 2} 
                           
@@ -52,69 +64,79 @@ class EarlybirdTree(QtGui.QTreeView):
         self.makeConnections()
         self.undoStack = QtGui.QUndoStack(self)
         
-        self.setStyleSheet("QTreeView::item:hover{background-color:#999966;}")  
+        self.setStyleSheet("QTreeView::item:hover{background-color: #C9C9C9;}") #previous was yellowish #999966;}")  
         self.headerLabels = sorted(self.columnIndices.iterkeys(), key=lambda k: self.columnIndices[k])
         self.model.setHorizontalHeaderLabels(self.headerLabels) 
+        self.setUniformRowHeights(True)  #Can make things a bit faster
         if self.filename:
             self.loadEarlybirdFile(self.filename)
 
     def makeConnections(self):
-        '''Connect all the signals-slots needed.'''
         self.model.itemDataChanged.connect(self.itemDataChangedSlot)
         self.clicked.connect(self.clickedSlot)
 
     def itemDataChangedSlot(self, item, oldValue, newValue, role):
-        '''Slot used to push changes of existing items onto undoStack'''
-        if role == QtCore.Qt.EditRole:
+        '''
+        When any data is changed in an item, the itemDataChanged signal is 
+        emitted, and calls this slot. This is used to pushed changes of
+        existing items onto the undo stack. For details of this, see:
+        http://stackoverflow.com/questions/29640408/how-to-treat-click-events-differently-for-an-items-checkbox-versus-its-text-p
+        '''
+        #print 'Itemdatachanged:', role, item.column(), oldValue, newValue #for debugging
+        if role == QtCore.Qt.EditRole:  #when text is changed
             command = CommandTextEdit(self, item, oldValue, newValue,
                 "Text changed from '{0}' to '{1}'".format(oldValue, newValue))
             self.undoStack.push(command)
             return True
-        if role == QtCore.Qt.CheckStateRole:
+        if role == QtCore.Qt.CheckStateRole:  #checkstate changed
             checkStateChangeCommand = CommandCheckStateChange(self, item, oldValue, newValue, 
                 "CheckState changed from '{0}' to '{1}'".format(oldValue, newValue))
             self.undoStack.push(checkStateChangeCommand)
             return True  
 
     def clickedSlot(self, index):
-        '''Handles slots associated with + and - (item add and remove)'''
+        '''
+        Whenever an item is clicked, this is called. This is used specifically to     
+        handle clicks of + and - (add and remove tasks)
+        '''
         if index.column() == self.columnIndices["+"]:
-            self.addItem(index)
+            self.addTask(index)
         if index.column() == self.columnIndices["-"]:
-            print "Remove item in row ", index.row()
-            self.removeItem(self.model, index)
-            #self.removeRow(index)
-            #self.modelChanged = True
+            #print "Remove item in row ", index.row()
+            self.removeTask(self.model, index)
 
-    def addItem(self, parentIndex = QtCore.QModelIndex()):
-        '''Add new row to parent'''
+
+    def addTask(self, parentIndex = QtCore.QModelIndex()):
+        '''       
+        Add new task row to given parent.
+        '''
         newNameItem = StandardItem("Double click to edit")
-        if parentIndex.isValid(): #Make a task
-            parentNameIndex = self.model.index(parentIndex.row(), 0, parentIndex.parent()) #add to column 0
+        if parentIndex.isValid(): #add to column 0 of parent
+            parentNameIndex = self.model.index(parentIndex.row(), 0, parentIndex.parent()) 
             parentNameItem = self.model.itemFromIndex(parentNameIndex)
-            newNameItem.setCheckable(True)
-            newNameItem.setCheckState(QtCore.Qt.Unchecked)
-            newTaskNameUserData ={"done": False}
-            newNameItem.setData(newTaskNameUserData, role = QtCore.Qt.UserRole)
-        else:  #Make a block
+        else: #add to root item
             parentNameItem = self.rootItem
-        newItemRow = self.makeItemRow(newNameItem) 
+        newNameItem.setCheckable(True)
+        newNameItem.setCheckState(QtCore.Qt.Unchecked)
+        newTaskNameUserData = {"done": False}
+        newNameItem.setData(newTaskNameUserData, role = QtCore.Qt.UserRole)
+        newItemRow = self.makeTaskRow(newNameItem) 
         description = "Added child to {0}".format(parentNameItem.text())
-        addCommand = CommandAddItem(self, parentNameItem, newItemRow, description)
+        addCommand = CommandAddTask(self, parentNameItem, newItemRow, description)
         self.undoStack.push(addCommand)
        
-    def removeItem(self, model, itemIndex = QtCore.QModelIndex()):
-        '''Remove clicked item'''
+    def removeTask(self, model, itemIndex = QtCore.QModelIndex()):
+        '''
+        Remove task with given index.
+        '''
         parentIndex = itemIndex.parent()
         if parentIndex.isValid():
             parentItem = model.itemFromIndex(parentIndex)
-            taskItem = parentItem.child(itemIndex.row(), 0)
-            description = "Removed '{0}' task".format(taskItem.text())
         else:
             parentItem = self.rootItem
-            taskItem = parentItem.child(itemIndex.row(), 0)
-            description = "Removed '{0}' block.".format(taskItem.text())
-        removeCommand = CommandRemoveItem(self, parentItem, taskItem, description)
+        taskItem = parentItem.child(itemIndex.row(), 0) #column 0
+        description = "Removed '{0}' task.".format(taskItem.text())
+        removeCommand = CommandRemoveTask(self, parentItem, taskItem, description)
         self.undoStack.push(removeCommand)
        
     '''
@@ -123,8 +145,10 @@ class EarlybirdTree(QtGui.QTreeView):
     ***
     '''
     def moveRowUp(self, index):  
-        '''Moves selected row up with children attached if it has children,
-        and only moves up within table it is in: not past parent'''
+        '''
+        Moves selected row up with children attached if it has children,
+        and only moves up within table it is in: not past parent
+        '''
         sourceRowNum = index.row()
         if sourceRowNum > 0:
             targetRowNum = sourceRowNum - 1
@@ -134,8 +158,10 @@ class EarlybirdTree(QtGui.QTreeView):
             self.undoStack.push(moveUpCommand)
 
     def moveRowDown(self, index):  
-        '''Moves selected row down with children attached if it has children,
-        and only moves down within table it is in: not below next parent'''           
+        '''
+        Moves selected row down with children attached if it has children,
+        and only moves down within table it is in: not below next parent
+        '''           
         numRows = self.model.rowCount(index.parent())
         sourceRowNum = index.row()
         if sourceRowNum < numRows - 1:
@@ -146,8 +172,10 @@ class EarlybirdTree(QtGui.QTreeView):
             self.undoStack.push(moveDownCommand)
     
     def swapRows(self, parentIndex, rowNumber1, rowNumber2):
-        '''Swaps two rows that have the same parent, hightights the
-            content originally in rowNumber1
+        '''
+        Swaps two rows that have the same parent, highlights the
+        content originally in rowNumber1. Is called by 
+        the command classes.
         '''               
         if parentIndex.isValid():
             parentItem = self.model.itemFromIndex(parentIndex)
@@ -156,8 +184,7 @@ class EarlybirdTree(QtGui.QTreeView):
                 parentItem.insertRow(rowNumber2, sourceRowItems)
             else:
                 return False
-
-        else:  #top-level block row
+        else:  #top-level task
             sourceRowItems = self.model.takeRow(rowNumber1)
             self.model.insertRow(rowNumber2, sourceRowItems)
         #Following selects item moved to rowNumber2 from rowNumber1:
@@ -168,13 +195,14 @@ class EarlybirdTree(QtGui.QTreeView):
          
     '''
     ***
-    Next five methods are part of mechanics for loading .eb files
+    Next four methods implement mechanics for loading .eb files
     ***
     '''
     def loadEarlybirdFile(self, filename = None):
-        '''Opens todo tree file (.eb) and populates model with data.'''
-        if not self.undoStack.isClean() and self.saveChangesDialog():
-            self.saveTodoData() 
+        ''' 
+        Opens eb file from memory and populates model with data.
+        '''
+        self.dirtySaveCheck()
         directoryName = os.path.dirname(filename) if filename else "."
         if not filename:
             filename, foo = QtGui.QFileDialog.getOpenFileName(None,
@@ -182,83 +210,90 @@ class EarlybirdTree(QtGui.QTreeView):
                     "(*.eb)")          
         if filename:
             with open(filename) as f:
-                fileData = json.load(f)
-            if self.populateModel(fileData, filename):
-                self.expandAll()
+                fileData = json.load(f) #loads data as dictionary
+            if self.populateModel(fileData):
                 self.filename = filename
-                for colNum in range(self.model.columnCount()):
-                    self.resizeColumnToContents(colNum)
                 self.undoStack.clear()
-                return True        
+                self.expandAll()
+                for colNum in range(self.model.columnCount()):  #expands to viewed contents, so do after expansion
+                    self.resizeColumnToContents(colNum)
+                return True   
+            else:
+                print "{0} not loaded correctly".format(filename)  #Refactor to Dialog? 
         return False   
     
-    def populateModel(self, fileData, filename):
-        '''Verify that top-level items are blocks, and calls methods to load data.'''
-        if "taskblocks" not in fileData:
-            print "Warning: Cannot load {0}.\n"\
-                  "Top level must contain taskblocks.".format(filename)
+    def populateModel(self, fileData):
+        '''
+        Takes dictionary of eb data and loads tasks into model.
+        '''
+        if "tasks" not in fileData:
             return False 
-        if "tasks" in fileData:
-            print "Warning: only reads taskblocks from top level.\n"\
-                  "Igorning top-level tasks in {0}.".format(filename)
-        taskblockList = fileData["taskblocks"]
+        taskList = fileData["tasks"]
         self.clearModel()
-        return self.loadTaskblocks(taskblockList)
-               
-    def loadTaskblocks(self, taskblockList):  
-        '''Load task blocks into the model'''
-        for (blockNum, taskblock) in enumerate(taskblockList): 
-            blockNameItem = StandardItem(taskblock["blockname"])
-            blockRow = self.makeItemRow(blockNameItem)           
-            self.rootItem.appendRow(blockRow)
-            if "tasks" in taskblock:
-                taskList = taskblock["tasks"]
-                self.loadTasks(taskList, blockRow) 
-        return True      
+        self.loadTasks(taskList, self.rootItem)
+        return True
        
     def loadTasks(self, taskList, parentRow):
-        '''Recursively load tasks until we hit a base task (a task w/o any subtasks).'''
+        '''
+        Recursively load tasks until we hit a base task (a task w/o any subtasks).
+        '''
         for (taskNum, task) in enumerate(taskList):
             taskNameItem = StandardItem(task["name"])
             taskNameItem.setCheckable(True)
-            #print "task and done", task["name"], task["done"]
+            #print "task and done", task["name"], task["done"]  #for debugging
             if task["done"]:
                 taskNameItem.setCheckState(QtCore.Qt.Checked)           
             else:
                 taskNameItem.setCheckState(QtCore.Qt.Unchecked)
-            taskRow = self.makeItemRow(taskNameItem)
-            parentRow[0].appendRow(taskRow) #add children only to column 0  
+            taskRow = self.makeTaskRow(taskNameItem)
+            if parentRow is self.rootItem:
+                parentRow.appendRow(taskRow)  
+            else:
+                parentRow[0].appendRow(taskRow) #add children only to column 0 
             if "tasks" in task:
                 subtaskList = task["tasks"]
-                return self.loadTasks(subtaskList, taskRow) 
+                self.loadTasks(subtaskList, taskRow) 
 
-    def makeItemRow(self, nameItem):
-        '''Create a row for insertion in the model.'''
-        itemRow = [None] * len(self.columnIndices)
-        itemRow[self.columnIndices["Task"]] = nameItem
-        itemRow[self.columnIndices["+"]] = StandardItem("+")
-        itemRow[self.columnIndices["-"]] = StandardItem("-") 
-        itemRow[self.columnIndices["+"]].setEditable(False)
-        itemRow[self.columnIndices["-"]].setEditable(False)  
-        return itemRow
+    def makeTaskRow(self, nameItem):
+        '''
+        Create a row for insertion in the model.
+        '''
+        taskRow = [None] * len(self.columnIndices)
+        taskRow[self.columnIndices["Task"]] = nameItem
+        taskRow[self.columnIndices["+"]] = StandardItem("+")
+        taskRow[self.columnIndices["-"]] = StandardItem("-") 
+        taskRow[self.columnIndices["+"]].setEditable(False)
+        taskRow[self.columnIndices["-"]].setEditable(False)  
+        return taskRow
         
     '''
     ****
     Next seven methods are part of the saving mechanics
-    ***
+    ****
     '''
+    def dirtySaveCheck(self):
+        '''
+        Check to see if the file has been changed, and if it has, ask if the
+        user wants to save changes. They can cancel, or save, or not save.
+        '''
+        if not self.undoStack.isClean():
+            saveDialogResponse = self.saveChangesDialog()
+            if saveDialogResponse == QtGui.QMessageBox.Cancel:
+                return #false
+            elif saveDialogResponse == QtGui.QMessageBox.Yes:  
+                self.saveTodoData()  
+    
     def saveChangesDialog(self):
         '''Ask if the user wants to save changes.'''
-        if QtGui.QMessageBox.question(self,
+        return QtGui.QMessageBox.question(self,
                 "Earlybird: Save changes?",
                 "Save unsaved changes first?",
-                QtGui.QMessageBox.Yes|QtGui.QMessageBox.No) == QtGui.QMessageBox.Yes:
-            return True
-        else:
-            return False
+                QtGui.QMessageBox.Yes | QtGui.QMessageBox.No | QtGui.QMessageBox.Cancel)
             
     def saveTodoData(self): 
-        '''Save data from the tree in json format'''
+        '''
+        Save data from the tree as json formatted eb file
+        '''
         if self.filename:
             dictModel = self.modelToDict()
             with open(self.filename, 'w') as fileToWrite:
@@ -268,7 +303,9 @@ class EarlybirdTree(QtGui.QTreeView):
         self.undoStack.clear()
             
     def saveTodoDataAs(self):
-        '''Save data in model as...x'''
+        '''
+        Save data in model as ... json formatted eb file
+        '''
         dir = os.path.dirname(self.filename) if self.filename is not None else "."
         self.filename, flt = QtGui.QFileDialog.getSaveFileName(None,
                 "EarlyBird: Load data file", dir, "EarlyBird data (*.eb)")           
@@ -279,89 +316,95 @@ class EarlybirdTree(QtGui.QTreeView):
                 json.dump(dictModel, fileToWrite, indent=2)
         self.undoStack.clear()
      
-    def modelToDict(self):  #def modelToDict(self, parentItem = self.rootItem):
-        '''Takes model presently in view, and saves all data as dictionary.
-        Called by self.saveTodoData() and self.saveTodoDataAs()'''
+    def modelToDict(self):  
+        '''
+        Takes model presently in view, and saves all data as dictionary.
+        Called by self.saveTodoData() and self.saveTodoDataAs()
+        '''
         dictModel = {}       
         if self.rootItem.rowCount():           
-            dictModel["taskblocks"]= self.createBlockList()
+            dictModel["tasks"]= self.createTaskList(self.rootItem)
             return dictModel
-            
-    def createBlockList(self):
-        '''Return list of dictionary-encoded blocks. Each block
-        also includes tasks curried from createTaskList()'''
-        blockNameItemList = self.getChildren(self.rootItem) #list of block name items without any children
-        numBlocks = len(blockNameItemList)
-        if numBlocks > 0:
-            blockNameDictList = [None]*numBlocks
-            for (blockNum, blockNameItem) in enumerate(blockNameItemList):
-                blockNameDict = {}  #create dictionary entry corresponding to each task block
-                blockNameDict["blockname"] = blockNameItem.text()               
-                #now see if the block has children (tasks)
-                if blockNameItem.rowCount():
-                    blockNameDict["tasks"] = self.createTaskList(blockNameItem)
-                blockNameDictList[blockNum] = blockNameDict
-            return blockNameDictList
-        else:
-            return None
-            
+                        
     def createTaskList(self, parentItem):
-        '''Recursively traverses model creating list of dictionary-encoded tasks to
-        be saved as json'''
-        taskNameList = self.getChildren(parentItem) 
-        numChildren = len(taskNameList)
+        '''  
+        Recursively traverses children creating list of dictionary-encoded tasks
+        (name and done properties) to be saved as json
+        '''
+        childItemsList = self.getChildren(parentItem) #list of column 0 items (includes text/checkstate etc)
+        numChildren = len(childItemsList)
         if numChildren > 0:
-            taskNameDictList = [None] * numChildren
-            for (childNum, childNameItem) in enumerate(taskNameList):
-                taskNameDict = {}
-                taskNameDict["name"] = childNameItem.text()
-                taskNameDict["done"] = True if childNameItem.checkState() else False
-                #now see if *this* task has children
-                if childNameItem.rowCount():
-                    taskNameDict["tasks"] = self.createTaskList(childNameItem)
-                taskNameDictList[childNum] = taskNameDict
-            return taskNameDictList
+            childDictList = [None] * numChildren
+            for (childNum, childItem) in enumerate(childItemsList):
+                childDict = {}
+                childDict["name"] = childItem.text()
+                childDict["done"] = True if childItem.checkState() else False
+                #now see if *this* child has children
+                if childItem.rowCount():
+                    childDict["tasks"] = self.createTaskList(childItem)
+                childDictList[childNum] = childDict
+            return childDictList
         else:
             return None
             
     def getChildren(self, parentItem):
-        '''Returns list of child items of parentItem. Used when converting
-        model to dictionary for saving as json'''
+        ''' 
+        Returns list of child name items (column 0) of parentItem. Used by createTaskList.
+        '''
         numChildren = parentItem.rowCount()
         if numChildren > 0:
             childItemList = [None] * numChildren
             for childNum in range(numChildren):
-                childItemList[childNum] = parentItem.child(childNum, 0)
+                childItemList[childNum] = parentItem.child(childNum, 0) #pulls column 0 
         else:
             childItemList = None
         return childItemList
         
-    '''Other sundry methods follow'''
+    '''
+    ***
+    Other sundry methods follow
+    ***
+    '''   
     def clearModel(self):
-        '''Clears data from model,clearing the view, but repopulates headers/root.
-        Used whenever an .eb file is loaded, or newFile method instantiated'''
+        '''
+        Clears data from model,clearing the view, but repopulates headers/root.
+        Used whenever an eb file is loaded, or newFile method instantiated
+        '''
         self.model.clear()
         self.model.setHorizontalHeaderLabels(self.headerLabels)
         self.rootItem = self.model.invisibleRootItem()   
         
     def newFile(self):
-        '''Creates blank tree'''
-        if not self.undoStack.isClean() and self.saveChangesDialog():
-            self.saveTodoData()
+        '''
+        Creates blank tree
+        '''
+        self.dirtySaveCheck()
         self.filename = None
         self.clearModel()
         self.undoStack.clear()
-       
+        
     def closeEvent(self, event):
-        if not self.undoStack.isClean() and self.saveChangesDialog():
-            self.fileSave()
-        self.close()
-
-
+        '''Allows user to ignore close event.'''
+        if not self.undoStack.isClean():
+            saveDialogResponse = self.saveChangesDialog()
+            if saveDialogResponse == QtGui.QMessageBox.Cancel:
+                event.ignore()  #This is why you don't use checkDirtySave()
+                return
+            elif saveDialogResponse == QtGui.QMessageBox.Yes:
+                self.saveTodoData()
+        event.accept()
             
-            
+
+'''
+***
+Following are all the command classes for pushing commands onto (or pulling 
+commands off of) the undo stack.
+***
+'''                  
 class CommandMoveRow(QtGui.QUndoCommand):
-    '''Push command that moves row up among its siblings'''
+    '''
+    Moves row up among its siblings
+    '''
     def __init__(self, view, parentIndex, sourceRowNum, targetRowNum, description):
         QtGui.QUndoCommand.__init__(self, description)
         self.parentIndex = parentIndex
@@ -374,46 +417,27 @@ class CommandMoveRow(QtGui.QUndoCommand):
         self.view.swapRows(self.parentIndex, self.targetRowNum, self.sourceRowNum)
 
         
-class CommandRemoveItem(QtGui.QUndoCommand):
-    '''Command to remove row from tree is pushed onto undo stack
-    
-       Will this aappropriately remove children of child too?
-       
-       Wasn't working for blocks: check!
-       
-       Don't like parentItem or (especially) childItem names'''
+class CommandRemoveTask(QtGui.QUndoCommand):
+    '''
+    Remove row from tree
+    '''
     def __init__(self, view, parentItem, childItem, description):
         QtGui.QUndoCommand.__init__(self, description)
         self.parentItem = parentItem
         self.view = view
-        self.childRow = self.view.makeItemRow(childItem)
+        self.childRow = self.view.makeTaskRow(childItem)
         self.rowNumber  = childItem.row()
-       
     def redo(self):
         self.parentItem.takeRow(self.rowNumber)
-       
     def undo(self):
         self.parentItem.insertRow(self.rowNumber, self.childRow)
         self.view.expandAll() #could just recursively expand thsi node
         
-        
-
-#Nomenclature:
-#general (block or task)
-#  nameItem/newNameItem
-#  itemRow/newItemRow 
-#Task Only
-#  taskRow/ newTaskRow
-#  taskNameItem / newTaskNameItem
-#Block only
-#  blockNameItem / newBlockNameItem
-#  blockRow / newBlockRow
-
-
     
-    
-class CommandAddItem(QtGui.QUndoCommand):
-    '''Command to add new row to parent item is pushed onto undo stack'''
+class CommandAddTask(QtGui.QUndoCommand):
+    '''
+    Add new row to tree
+    '''
     def __init__(self, view, parentItem, newTaskRow, description):
         QtGui.QUndoCommand.__init__(self, description)
         self.parentItem = parentItem
@@ -425,20 +449,26 @@ class CommandAddItem(QtGui.QUndoCommand):
     def undo(self):
         self.parentItem.takeRow(self.newTaskRow[0].row())
           
+          
 class CommandTextEdit(QtGui.QUndoCommand):
-    '''Command for undoing/redoing text edit changes, to be placed in undostack'''
+    '''
+    Undo/redo text edit changes
+    
+    The disconnect is needed to avoid infinite calls to itemDataChangedSlot:
+      http://stackoverflow.com/questions/29527610/how-to-undo-edit-of-qstandarditem-in-pyside-pyqt
+    Namely, itemDataChangedSlot would call this, but when this is called and text changed, then
+    itemDataChangedSlot would be called again, and so on. To block this, disconnect the slot temporarily.
+    '''
     def __init__(self, earlybirdTree, item, oldText, newText, description):
         QtGui.QUndoCommand.__init__(self, description)
         self.item = item
         self.tree = earlybirdTree
         self.oldText = oldText
         self.newText = newText
-
     def redo(self):      
         self.item.model().itemDataChanged.disconnect(self.tree.itemDataChangedSlot) 
         self.item.setText(self.newText)
         self.item.model().itemDataChanged.connect(self.tree.itemDataChangedSlot) 
-
     def undo(self):
         self.item.model().itemDataChanged.disconnect(self.tree.itemDataChangedSlot) 
         self.item.setText(self.oldText)
@@ -446,19 +476,21 @@ class CommandTextEdit(QtGui.QUndoCommand):
         
 
 class CommandCheckStateChange(QtGui.QUndoCommand):
-    '''Command for undoing/redoing check state changes, to be placed in undostack'''
+    '''
+    Undoing/redo checkbox state changes
+    
+    For reasoning behind disconnect/connect, see docs for CommandTextEdit.
+    '''
     def __init__(self, earlybirdTree, item, oldCheckState, newCheckState, description):
         QtGui.QUndoCommand.__init__(self, description)
         self.item = item
         self.tree = earlybirdTree
         self.oldCheckState = QtCore.Qt.Unchecked if oldCheckState == 0 else QtCore.Qt.Checked
         self.newCheckState = QtCore.Qt.Checked if oldCheckState == 0 else QtCore.Qt.Unchecked
-
     def redo(self):
         self.item.model().itemDataChanged.disconnect(self.tree.itemDataChangedSlot) 
         self.item.setCheckState(self.newCheckState)
         self.item.model().itemDataChanged.connect(self.tree.itemDataChangedSlot) 
-        
     def undo(self):
         self.item.model().itemDataChanged.disconnect(self.tree.itemDataChangedSlot)
         self.item.setCheckState(self.oldCheckState)
@@ -467,10 +499,10 @@ class CommandCheckStateChange(QtGui.QUndoCommand):
         
 def main():
     ebApp = QtGui.QApplication(sys.argv)
-    firstEb = EarlybirdTree(filename = "../tests/unit/blockOnlyTest.eb")
+    firstEb = EarlybirdTree(filename = "../tests/unit/properFormatTest.eb") #examples/simpleTree.eb")
     firstEb.show()
-    undoView = QtGui.QUndoView(firstEb.undoStack)
-    undoView.show()
+    #undoView = QtGui.QUndoView(firstEb.undoStack)
+    #undoView.show()
     sys.exit(ebApp.exec_())
 
 

@@ -1,0 +1,24 @@
+{
+  "tasks": [
+    {
+    "name": "Home",
+    "done": false,
+      "tasks": [
+        {
+          "name": "Clean room", 
+          "done": false
+        }
+      ]
+    }, 
+    {
+      "name": "Work",
+	  "done" : false,
+      "tasks": [
+        {
+          "done": false, 
+          "name": "Analysis"
+        }
+      ]
+    }
+  ]
+}

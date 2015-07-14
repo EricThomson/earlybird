@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 earlybirdMain.py
-    A wrapper for the EarlybirdTree class. It allows for user interaction
+     A wrapper for the EarlybirdTree class. It allows for user interaction
     with a to do tree that is defined in earlybirdTree.py.
     
 Early bird to do tree. 
 Because life ain't a list.
-
 """
 import sys
 import os
@@ -14,7 +13,9 @@ from PySide import QtGui, QtCore
 from earlybirdTree import EarlybirdTree
 
 class EarlybirdMain(QtGui.QMainWindow):
-    '''Main window to wrap an EarlybirdTree'''
+    '''
+    Main window to wrap an EarlybirdTree
+    '''
     def __init__(self, filename = None):
         QtGui.QMainWindow.__init__(self)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose) 
@@ -39,15 +40,20 @@ class EarlybirdMain(QtGui.QMainWindow):
         self.itemToolbar = self.addToolBar("Item actions")
         self.itemToolbar.addAction(self.undoAction)
         self.itemToolbar.addAction(self.redoAction)
-        self.itemToolbar.addAction(self.addBlockAction)
+        self.itemToolbar.addAction(self.addTaskAction)
         self.itemToolbar.addAction(self.itemUpAction)
         self.itemToolbar.addAction(self.itemDownAction)
 
     def closeEvent(self, event):
         '''If data has been changed, ask user if she wants to save it'''
-        if not self.view.undoStack.isClean() and self.view.saveChangesDialog():
-            self.view.fileSave()
-        self.close()
+        if not self.view.undoStack.isClean():
+            saveDialogResponse = self.view.saveChangesDialog()
+            if saveDialogResponse == QtGui.QMessageBox.Cancel:
+                event.ignore()
+                return
+            elif saveDialogResponse == QtGui.QMessageBox.Yes:
+                self.view.saveTodoData()
+        event.accept()
     
     def createMenus(self):
         '''Create menu for actions on files'''
@@ -84,9 +90,9 @@ class EarlybirdMain(QtGui.QMainWindow):
         self.redoAction = self.createAction("Redo", slot = self.view.undoStack.redo,
                icon = "ebRedo", tip = "Redo",
                status = "Redo next action in undo stack")     
-        self.addBlockAction = self.createAction("Add block", slot = self.addBlock,
-               icon = "blockAdd", tip = "Add task block",
-               status = "Append task block to tree")
+        self.addTaskAction = self.createAction("Add block", slot = self.addTask,
+               icon = "ebAddTask", tip = "Add task",
+               status = "Append top-level task to tree")
         self.itemUpAction = self.createAction("Move up", slot = self.moveRowUp,
                icon = "ebMoveUp", tip = "Move up",
                status = "Move selected item up in the tree")
@@ -149,7 +155,9 @@ class EarlybirdMain(QtGui.QMainWindow):
             self.windowTitleSet()
         
     def fileOpen(self):
-        '''Load earlybird file from memory.'''
+        '''
+        Load earlybird file from memory.
+        '''
         if self.view.loadEarlybirdFile():
             self.model = self.view.model  
             self.windowTitleSet()
@@ -158,13 +166,14 @@ class EarlybirdMain(QtGui.QMainWindow):
                 self.status.showMessage("Opened file: {0}".format(filenameNopath))
             
     def newFile(self):
-        '''Opens new blank earlybird file'''
+        '''
+        Opens new blank earlybird file
+        '''
         self.view.newFile()
         self.windowTitleSet()
         
-    def addBlock(self):
-        self.view.addItem()
-        
+    def addTask(self):
+        self.view.addTask()
         
     def windowTitleSet(self):
         '''Displays filename as window title, if it exists.'''
@@ -183,10 +192,10 @@ def main():
     ebApp.setStyle('Cleanlooks')  #cleanlooks
     #print QtGui.QStyleFactory.keys()
     #ebApp.setStyle("Plastique")
-    mainEb = EarlybirdMain(filename = None)#"simpleTodo.eb"
+    mainEb = EarlybirdMain(filename = "../examples/simpleTree.eb")  #None
     mainEb.show()
-    undoView = QtGui.QUndoView(mainEb.view.undoStack)
-    undoView.show()
+    #undoView = QtGui.QUndoView(mainEb.view.undoStack)
+    #undoView.show()
     sys.exit(ebApp.exec_())
 
 
@@ -194,19 +203,5 @@ if __name__ == "__main__":
     main()
     
     
-#        def resizeWindowToTree(self):
-#        #Based on: 
-#        #http://stackoverflow.com/questions/26960006/in-qdialog-resize-window-to-contain-all-columns-of-qtableview     
-#        margins = self.layout().contentsMargins()
-#        marginWidth = margins.left() + margins.right()
-#        frameWidth = self.treeView.frameWidth() * 2
-#        vertHeaderWidth = 0 #self.treeView.verticalHeader().width()
-#        horizHeaderWidth =self.treeView.header().length()
-#        #print "horizHeaderWidth ", horizHeaderWidth
-#        vertScrollWidth = self.treeView.style().pixelMetric(QtGui.QStyle.PM_ScrollBarExtent)  
-#        newWidth = marginWidth + frameWidth + vertHeaderWidth + horizHeaderWidth + vertScrollWidth
-#        if newWidth <= 800:
-#            self.resize(newWidth, self.height())
-#        else:
-#            self.resize(800, self.height())  
+
     

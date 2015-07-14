@@ -1,0 +1,22 @@
+{
+  "tasks": [
+    {
+      "done": false, 
+      "name": "Clean home"
+    }, 
+    {
+      "tasks": [
+        {
+          "done": true, 
+          "name": "Buy curtains"
+        }, 
+        {
+          "done": false, 
+          "name": "Pay handyman to install them"
+        }
+      ], 
+      "done": false, 
+      "name": "Install curtains"
+    }
+  ]
+}
