@@ -3,9 +3,7 @@
 earlybirdTree.py: defines the EarlyBirdTree class:
 Uses QStandardItemModel with QTreeView to make a simple, flexible to-do tree.
 
-Make sure they both work
-Make sure unit tests work
-Reup at github.
+Check/uncheck (and need to have this part of load now too)
 """
 
 
@@ -242,7 +240,8 @@ class EarlybirdTree(QtGui.QTreeView):
             taskNameItem.setCheckable(True)
             #print "task and done", task["name"], task["done"]  #for debugging
             if task["done"]:
-                taskNameItem.setCheckState(QtCore.Qt.Checked)           
+                taskNameItem.setCheckState(QtCore.Qt.Checked)  
+                self.strikeItem(taskNameItem)
             else:
                 taskNameItem.setCheckState(QtCore.Qt.Unchecked)
             taskRow = self.makeTaskRow(taskNameItem)
@@ -383,6 +382,16 @@ class EarlybirdTree(QtGui.QTreeView):
         self.clearModel()
         self.undoStack.clear()
         
+    def strikeItem(self, item):
+        itemFont = item.font()
+        itemFont.setStrikeOut(True)
+        item.setFont(itemFont)   
+        
+    def unstrikeItem(self, item):
+        itemFont = item.font()
+        itemFont.setStrikeOut(False)
+        item.setFont(itemFont)
+        
     def closeEvent(self, event):
         '''Allows user to ignore close event.'''
         if not self.undoStack.isClean():
@@ -490,10 +499,18 @@ class CommandCheckStateChange(QtGui.QUndoCommand):
     def redo(self):
         self.item.model().itemDataChanged.disconnect(self.tree.itemDataChangedSlot) 
         self.item.setCheckState(self.newCheckState)
+        if self.newCheckState == QtCore.Qt.Checked:
+            self.tree.strikeItem(self.item)
+        else:
+            self.tree.unstrikeItem(self.item)
         self.item.model().itemDataChanged.connect(self.tree.itemDataChangedSlot) 
     def undo(self):
         self.item.model().itemDataChanged.disconnect(self.tree.itemDataChangedSlot)
         self.item.setCheckState(self.oldCheckState)
+        if self.oldCheckState == QtCore.Qt.Checked:
+            self.tree.strikeItem(self.item)
+        else:
+            self.tree.unstrikeItem(self.item)
         self.item.model().itemDataChanged.connect(self.tree.itemDataChangedSlot) 
 
         
@@ -501,8 +518,8 @@ def main():
     ebApp = QtGui.QApplication(sys.argv)
     firstEb = EarlybirdTree(filename = "../tests/unit/properFormatTest.eb") #examples/simpleTree.eb")
     firstEb.show()
-    #undoView = QtGui.QUndoView(firstEb.undoStack)
-    #undoView.show()
+    undoView = QtGui.QUndoView(firstEb.undoStack)
+    undoView.show()
     sys.exit(ebApp.exec_())
 
 
