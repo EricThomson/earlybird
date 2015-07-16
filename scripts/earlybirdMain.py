@@ -90,7 +90,7 @@ class EarlybirdMain(QtGui.QMainWindow):
         self.redoAction = self.createAction("Redo", slot = self.view.undoStack.redo,
                icon = "ebRedo", tip = "Redo",
                status = "Redo next action in undo stack")     
-        self.addTaskAction = self.createAction("Add block", slot = self.addTask,
+        self.addTaskAction = self.createAction("Add task", slot = self.addTask,
                icon = "ebAddTask", tip = "Add task",
                status = "Append top-level task to tree")
         self.itemUpAction = self.createAction("Move up", slot = self.moveRowUp,

@@ -12,7 +12,7 @@
         }
       ], 
       "done": false, 
-      "name": "Home"
+      "name": "Home chores"
     }, 
     {
       "tasks": [
@@ -27,12 +27,12 @@
               "name": "Plot data"
             }, 
             {
-              "done": false, 
-              "name": "Save files in new computer"
+              "done": true, 
+              "name": "Sort files"
             }, 
             {
               "done": true, 
-              "name": "Sort files"
+              "name": "Save files in new computer"
             }
           ], 
           "done": false, 

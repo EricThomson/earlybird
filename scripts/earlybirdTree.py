@@ -132,9 +132,9 @@ class EarlybirdTree(QtGui.QTreeView):
             parentItem = model.itemFromIndex(parentIndex)
         else:
             parentItem = self.rootItem
-        taskItem = parentItem.child(itemIndex.row(), 0) #column 0
-        description = "Removed '{0}' task.".format(taskItem.text())
-        removeCommand = CommandRemoveTask(self, parentItem, taskItem, description)
+        taskNameItem = parentItem.child(itemIndex.row(), 0) #column 0
+        description = "Removed '{0}' task.".format(taskNameItem.text())
+        removeCommand = CommandRemoveTask(self, parentItem, taskNameItem, description)
         self.undoStack.push(removeCommand)
        
     '''
