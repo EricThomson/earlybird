@@ -1,4 +1,4 @@
-#Earlybird To Do Tree
+# Earlybird To Do Tree
 A simple to-do tree application written in PySide.
 
 The application includes two main classes:
@@ -7,18 +7,18 @@ The application includes two main classes:
 
 The data for a tree is stored in a json file with an `.eb` extension. The eb files contain an array of tasks, each task consists of the `name` of the task (e.g., "Clean room"), and the `done` state of the task (e.g., `true`). Each task can also contain a nested array of tasks.
 
-##Getting started
+## Getting started
 I recommend starting by running `earlybirdMain`. The folder `earlybird/examples` includes the following example, which you can load: 
 
 - `simpleTree.eb`   
 
 Using the app should be intuitive once you have the example loaded.
 
-###Conventions for variable names
+### Conventions for variable names
 - Task-related variables: taskRow/ newTaskRow ; taskNameItem / newTaskNameItem
 - Children and parents: parentIndex/parentItem ; childIndex/childItem; itemIndex/item
     
-####Open questions
+#### Open questions
 
 *setData versus undoStack push*
 
